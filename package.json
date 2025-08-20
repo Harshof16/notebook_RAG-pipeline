@@ -16,13 +16,15 @@
     "axios": "^1.11.0",
     "cheerio": "^1.1.2",
     "langchain": "^0.3.31",
+    "multer": "^2.0.2",
     "next": "15.4.7",
     "openai": "^5.13.1",
     "papaparse": "^5.5.3",
     "pdf-parse": "^1.1.1",
     "qdrant-client": "^0.0.1",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-hot-toast": "^2.6.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

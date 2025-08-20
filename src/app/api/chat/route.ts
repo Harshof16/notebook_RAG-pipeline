@@ -1,12 +1,16 @@
-// app/api/chat/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { OpenAIEmbeddings, ChatOpenAI } from "@langchain/openai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { RunnableSequence } from "@langchain/core/runnables";
 
-export async function POST(req: Request) {
+// Initialize embeddings (must match upload route)
+const chatEmbeddings = new OpenAIEmbeddings({
+  openAIApiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(req: NextRequest) {
   try {
     const { query } = await req.json();
 
@@ -14,46 +18,83 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    // 1. Ready the client OpenAI Embedding Model
-    const embeddings = new OpenAIEmbeddings({
-      model: "text-embedding-3-small",
-    });
+    console.log("Received query:", query);
 
-    // 2. Load existing Qdrant collection
+    // ✅ Connect to existing Qdrant collection
     const vectorStore = await QdrantVectorStore.fromExistingCollection(
-      embeddings,
+      chatEmbeddings,
       {
         collectionName: "notebook-collection",
-        url: "http://localhost:6333", // Qdrant instance URL
+        url: process.env.QDRANT_URL || "http://localhost:6333",
       }
     );
 
-    // 3. Prepare retriever
+    // ✅ Test retriever first
     const retriever = vectorStore.asRetriever({
-      k: 3, // number of chunks to fetch
+      k: 5, // Get more chunks for better context
+      searchType: "similarity",
     });
 
-    // 4. Define LLM (ChatGPT model)
-    const llm = new ChatOpenAI({
-      model: "gpt-4o-mini", // or gpt-4, gpt-3.5-turbo
-    //   temperature: 0.2,
+    console.log("Testing retriever...");
+    const relevantChunks = await retriever.invoke(query);
+    console.log(`Retrieved ${relevantChunks.length} relevant chunks`);
+    
+    // Debug retrieved chunks
+    relevantChunks.forEach((chunk, idx) => {
+      console.log(`Chunk ${idx + 1}:`, {
+        size: chunk.pageContent.length,
+        metadata: chunk.metadata,
+        preview: chunk.pageContent.substring(0, 150) + '...'
+      });
     });
 
-    // 5. Define a prompt template
+    if (relevantChunks.length === 0) {
+      return NextResponse.json({
+        answer: "I couldn't find any relevant information in the uploaded documents to answer your question.",
+        chunks: 0
+      });
+    }
+
+    // ✅ Format context properly
+    const context = relevantChunks.map((doc, idx) => {
+      const metadata = doc.metadata || {};
+      return `--- Chunk ${idx + 1} ---
+Source: ${metadata.source || 'Unknown'}
+Content: ${doc.pageContent}`;
+    }).join("\n\n");
+
+    // ✅ Complete prompt template
     const prompt = PromptTemplate.fromTemplate(`
-You are an AI assistant who helps resolving user query based on the
-    context available to you from a PDF file with the content and page number.
+You are an AI assistant helping users understand their uploaded documents.
 
-    Only answer based on the available context from file only.
+Instructions:
+- Answer ONLY based on the provided context from the documents
+- Be specific and reference relevant information from the context
+- If the context doesn't contain enough information, say so clearly
+- Provide accurate, helpful responses
 
-    Context:`);
+Context from Documents:
+{context}
 
-    // 6. Build chain (Retriever → Prompt → LLM → Output)
+User Question: {question}
+
+Answer:`);
+
+    // ✅ LangChain approach (recommended)
+    const llm = new ChatOpenAI({
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      openAIApiKey: process.env.OPENAI_API_KEY,
+    });
+
     const chain = RunnableSequence.from([
       {
         context: async (input: { question: string }) => {
           const docs = await retriever.invoke(input.question);
-          return docs.map((d) => d.pageContent).join("\n\n");
+          return docs.map((d, idx) => {
+            const metadata = d.metadata || {};
+            return `[Document ${idx + 1}] ${d.pageContent}`;
+          }).join("\n\n");
         },
         question: (input: { question: string }) => input.question,
       },
@@ -62,15 +103,29 @@ You are an AI assistant who helps resolving user query based on the
       new StringOutputParser(),
     ]);
 
-    // 7. Run chain
     const finalAnswer = await chain.invoke({ question: query });
 
+    console.log("Final Answer:", finalAnswer);
+
     return NextResponse.json({
+      success: true,
       answer: finalAnswer,
+      chunksRetrieved: relevantChunks.length,
+      debug: {
+        contextLength: context.length,
+        chunkSizes: relevantChunks.map(c => c.pageContent.length)
+      }
     });
+
   } catch (error: any) {
+    console.error("Error in chat processing:", error);
+    
     return NextResponse.json(
-      { error: error.message || "Something went wrong" },
+      { 
+        success: false,
+        error: error.message || "Something went wrong",
+        details: error.stack
+      },
       { status: 500 }
     );
   }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-
-import { TextLoader } from "langchain/document_loaders/fs/text";
-
+import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { CSVLoader } from "@langchain/community/document_loaders/fs/csv";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { OpenAIEmbeddings } from "@langchain/openai";
@@ -9,29 +9,22 @@ import { Document as LangchainDocument } from "langchain/document";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { CSVLoader } from "@langchain/community/document_loaders/fs/csv";
+import { TextLoader } from "langchain/document_loaders/fs/text";
 
 // Type definitions for better TypeScript support
 type DocumentType = LangchainDocument<Record<string, any>>;
 
-// Initialize embeddings (make sure to set your OpenAI API key)
+// Initialize embeddings
 const embeddings = new OpenAIEmbeddings({
   openAIApiKey: process.env.OPENAI_API_KEY,
 });
 
-// Initialize text splitter with optimal settings
+// ✅ IMPORTANT: Initialize text splitter for chunking
 const textSplitter = new RecursiveCharacterTextSplitter({
   chunkSize: 1000,
   chunkOverlap: 200,
   separators: ["\n\n", "\n", " ", ""],
 });
-
-// Helper function to extract text from documents (keeping your original logic)
-function extractTextFromDocs(docs: DocumentType[]): string {
-  return docs.map(doc => doc.pageContent).join("\n");
-}
 
 export async function POST(req: NextRequest) {
   let tempPath: string | null = null;
@@ -43,13 +36,11 @@ export async function POST(req: NextRequest) {
     console.log("Processing request with type:", { url: !!url, text: !!text, fileType });
 
     if (url) {
-      // ✅ Crawl + extract <p> tags with Cheerio loader
       console.log("Loading content from URL:", url);
       const loader = new CheerioWebBaseLoader(url, { selector: "p" });
       docs = await loader.load();
       
     } else if (text) {
-      // ✅ Direct text input - create Document object
       console.log("Processing direct text input");
       docs = [new LangchainDocument({ 
         pageContent: text,
@@ -57,54 +48,49 @@ export async function POST(req: NextRequest) {
       })];
       
     } else if (fileContent && fileType) {
-      // ✅ Process uploaded file
       console.log("Processing uploaded file of type:", fileType);
       
-      // Decode base64 → buffer
-      const buffer = Buffer.from(fileContent, "base64");
-      
-      // Validate PDF structure for debugging
-      if (fileType === "pdf") {
-        console.log("Buffer size:", buffer.length);
-        console.log("First 10 bytes:", buffer.slice(0, 10));
-        console.log("PDF header check:", buffer.toString('utf8', 0, 4) === '%PDF');
-        
-        if (buffer.length < 100) {
-          throw new Error("PDF file appears to be too small or corrupted");
-        }
-        
-        if (buffer.toString('utf8', 0, 4) !== '%PDF') {
-          throw new Error("Invalid PDF header - file may not be a valid PDF");
+      // Clean base64 string - remove data URL prefix if present
+      let cleanBase64 = fileContent;
+      if (fileContent.includes(',')) {
+        const parts = fileContent.split(',');
+        if (parts.length > 1) {
+          cleanBase64 = parts[1];
+          console.log("Removed data URL prefix");
         }
       }
+      
+      // Remove any whitespace
+      cleanBase64 = cleanBase64.replace(/\s/g, '');
+      
+      // Decode base64 → buffer
+      const buffer = Buffer.from(cleanBase64, "base64");
+      console.log("Decoded buffer size:", buffer.length, "bytes");
       
       // Load documents based on file type
       if (fileType === "pdf") {
         console.log("Loading PDF document...");
         
-        // Try multiple approaches for PDF loading
-        try {
-          // Approach 1: Create a proper Blob with correct MIME type
-          const pdfBlob = new Blob([buffer], { type: 'application/pdf' });
-          const loader = new PDFLoader(pdfBlob);
-          docs = await loader.load();
-        } catch (blobError) {
-          console.warn("Blob approach failed, trying file path approach:", blobError);
-          
-          // Approach 2: Write to temporary file
-          const fileExtension = '.pdf';
-          tempPath = path.join(os.tmpdir(), `upload-${Date.now()}${fileExtension}`);
-          fs.writeFileSync(tempPath, buffer);
-          
-          const loader = new PDFLoader(tempPath);
-          docs = await loader.load();
+        // Enhanced PDF validation
+        if (buffer.length < 1024) {
+          throw new Error(`PDF file too small: ${buffer.length} bytes`);
         }
+        
+        const header = buffer.toString('utf8', 0, 8);
+        if (!header.startsWith('%PDF-')) {
+          throw new Error(`Invalid PDF header: "${header}"`);
+        }
+        
+        // Create temporary file for PDF
+        tempPath = path.join(os.tmpdir(), `upload-${Date.now()}.pdf`);
+        fs.writeFileSync(tempPath, buffer);
+        
+        const loader = new PDFLoader(tempPath);
+        docs = await loader.load();
         
       } else if (fileType === "csv") {
         console.log("Loading CSV document...");
-        // For CSV, create temporary file
-        const fileExtension = '.csv';
-        tempPath = path.join(os.tmpdir(), `upload-${Date.now()}${fileExtension}`);
+        tempPath = path.join(os.tmpdir(), `upload-${Date.now()}.csv`);
         fs.writeFileSync(tempPath, buffer);
         
         const loader = new CSVLoader(tempPath);
@@ -112,27 +98,18 @@ export async function POST(req: NextRequest) {
         
       } else if (fileType === "txt") {
         console.log("Loading text document...");
-        // For text files, we can use the buffer directly or create a blob
-        try {
-          const textBlob = new Blob([buffer], { type: 'text/plain' });
-          const loader = new TextLoader(textBlob);
-          docs = await loader.load();
-        } catch (blobError) {
-          // Fallback to file approach
-          const fileExtension = '.txt';
-          tempPath = path.join(os.tmpdir(), `upload-${Date.now()}${fileExtension}`);
-          fs.writeFileSync(tempPath, buffer);
-          
-          const loader = new TextLoader(tempPath);
-          docs = await loader.load();
-        }
+        tempPath = path.join(os.tmpdir(), `upload-${Date.now()}.txt`);
+        fs.writeFileSync(tempPath, buffer);
+        
+        const loader = new TextLoader(tempPath);
+        docs = await loader.load();
         
       } else {
         throw new Error(`Unsupported file type: ${fileType}`);
       }
       
     } else {
-      throw new Error("No valid input provided (url, text, or fileContent required)");
+      throw new Error("No valid input provided");
     }
 
     if (!docs || docs.length === 0) {
@@ -141,13 +118,12 @@ export async function POST(req: NextRequest) {
 
     console.log(`Loaded ${docs.length} document(s)`);
 
-    // ✅ Split documents into chunks using LangChain text splitter
+    // ✅ CRITICAL: Split documents into chunks
     console.log("Splitting documents into chunks...");
     const chunkedDocs = await textSplitter.splitDocuments(docs);
-    
     console.log(`Created ${chunkedDocs.length} chunks from ${docs.length} document(s)`);
 
-    // Add metadata to chunks for better tracking
+    // Add enhanced metadata to chunks
     const enrichedDocs: DocumentType[] = chunkedDocs.map((doc, index) => {
       return new LangchainDocument({
         pageContent: doc.pageContent,
@@ -157,6 +133,7 @@ export async function POST(req: NextRequest) {
           totalChunks: chunkedDocs.length,
           chunkSize: doc.pageContent.length,
           timestamp: new Date().toISOString(),
+          fileType: fileType || 'unknown',
         }
       });
     });
@@ -164,18 +141,11 @@ export async function POST(req: NextRequest) {
     // ✅ Store in Qdrant Vector Database
     console.log("Storing chunks in Qdrant vector database...");
     const vectorStore = await QdrantVectorStore.fromDocuments(
-      enrichedDocs,
+      enrichedDocs, // Use chunked docs, not original docs
       embeddings,
       {
         collectionName: "notebook-collection",
-        url: "http://localhost:6333",
-        // Optional: Add collection configuration
-        collectionConfig: {
-          vectors: {
-            size: 1536, // OpenAI embedding dimension
-            distance: "Cosine",
-          },
-        },
+        url: process.env.QDRANT_URL || "http://localhost:6333",
       }
     );
 
@@ -207,7 +177,7 @@ export async function POST(req: NextRequest) {
     );
     
   } finally {
-    // ✅ Cleanup temporary file
+    // Cleanup temporary file
     if (tempPath && fs.existsSync(tempPath)) {
       try {
         fs.unlinkSync(tempPath);
@@ -216,23 +186,5 @@ export async function POST(req: NextRequest) {
         console.warn("Failed to cleanup temporary file:", cleanupError);
       }
     }
-  }
-}
-
-// Optional: Add a GET endpoint to check vector store status
-export async function GET(req: NextRequest) {
-  try {
-    // You could add logic here to check collection status, count documents, etc.
-    return NextResponse.json({
-      success: true,
-      message: "Vector store endpoint is active",
-      collectionName: "notebook-collection",
-      qdrantUrl: "http://localhost:6333",
-    });
-  } catch (error) {
-    return NextResponse.json(
-      { success: false, error: "Failed to check vector store status" },
-      { status: 500 }
-    );
   }
 }
