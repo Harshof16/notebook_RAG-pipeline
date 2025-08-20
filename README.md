@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📚 RAG Chat App
 
-## Getting Started
+A simple **Retrieval-Augmented Generation (RAG)** web application built with **Next.js, LangChain, Qdrant, and OpenAI**.  
+Users can upload documents (PDF, TXT, CSV) or provide a website URL, and then query the data through a chat interface.  
 
-First, run the development server:
+👉 Live Demo[https://notebook-rag-pipeline.vercel.app/]
 
+---
+
+## 🚀 Features
+- 📄 Upload multiple file types: **PDF, CSV, TXT**
+- 🌐 Add **website as data source** (scraped & indexed)
+- 💬 Chatbot interface to query indexed data
+- ⚡ Chunking + Embeddings for efficient retrieval
+- 📦 Vector storage powered by **Qdrant** (local via Docker or Qdrant Cloud)
+- 🎯 Accurate contextual answers using **OpenAI**
+- 🖥️ Clean UI & smooth workflow
+
+---
+
+## 🏗️ Tech Stack
+- **Frontend:** Next.js (React, Tailwind CSS)  
+- **Backend:** Next.js API Routes (Node.js utils)  
+- **LLM & Embeddings:** OpenAI GPT + `text-embedding-3-small`  
+- **Vector Database:** Qdrant (Cloud or Docker local setup)  
+- **Text Processing:** LangChain loaders & splitters  
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1️⃣ Clone the Repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-username/rag-chat-app.git
+cd rag-chat-app
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2️⃣ Install Dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3️⃣ Environment Variables
+Create a .env.local file in the root:
+```bash
+OPENAI_API_KEY=your_openai_api_key
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# If using Qdrant Cloud
+QDRANT_URL=https://your-instance-url.qdrant.cloud
+QDRANT_API_KEY=your_qdrant_api_key
 
-## Learn More
+# If using local Docker Qdrant
+QDRANT_URL=http://localhost:6333
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4️⃣ Run Qdrant (Development Only)
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 5️⃣ Start the App
+```bash
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+App will run at: http://localhost:3000
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📘 Usage
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Open the app in your browser
+2. Upload a PDF/CSV/TXT file or enter a website URL
+3. Data will be chunked, embedded, and indexed into Qdrant
+4. Ask questions in the chat window
+5. Bot responds with answers grounded in your uploaded data
+
+---
+
+## 📹 Demo
+
+* File Upload: Upload PDF → Ask → Get answer
+* Website Input: Enter URL → Ask → Get answer
+
+## 📌 Future Improvements
+
+* Add support for images (OCR-based extraction)
+* Multi-file search with citations
+* Persistent chat history with memory
+* UI polish with persona prompts
+
+👨‍💻 Author
+
+Made with ❤️ in one-night hack by [Harsh Shukla]
