@@ -146,8 +146,10 @@ export async function POST(req: NextRequest) {
       {
         collectionName: "notebook-collection",
         url: process.env.QDRANT_URL || "http://localhost:6333",
+        apiKey: process.env.QDRANT_API_KEY || "",
       }
     );
+    console.log(`vectorStore: `, vectorStore);
 
     console.log(`Successfully stored ${enrichedDocs.length} chunks in vector database`);
 

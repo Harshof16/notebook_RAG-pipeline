@@ -1,15 +1,19 @@
 "use client";
 
 import axios from "axios";
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle, ForwardedRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 interface Msg {
     role: "user" | "assistant" | "system";
     text: string;
 }
+export type ChatHandle = {
+    clear: () => void;
+    load?: (id: string) => void;
+};
 
-function Chat(props: any, ref: any) {
+function Chat(props: {}, ref: ForwardedRef<ChatHandle | null>) {
     const defaultWelcome: Msg = {
         role: "system",
         text: "Welcome to ChaiCode Mentorship\n\nStart coding conversations with your mentor. Ask questions, seek guidance, or discuss any programming topics you'd like to explore.",
@@ -55,7 +59,7 @@ function Chat(props: any, ref: any) {
                     { role: "system", text: "Unexpected response from server." },
                 ]);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
             const msg = (error as any)?.response?.data?.error || (error as any)?.message || "Something went wrong. Please try again.";
             toast.error(msg);
@@ -98,7 +102,7 @@ function Chat(props: any, ref: any) {
                                 <span className="text-white font-bold text-lg">🧠</span>
                             </div>
                             <div>
-                                <h3 className="font-bold text-white">DocuMind</h3>
+                                <h3 className="font-bold text-white">RecallAI</h3>
                                 <div className="flex items-center gap-2 text-xs">
                                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                                     <span className="text-green-400">Online</span>
@@ -146,7 +150,7 @@ function Chat(props: any, ref: any) {
                                                 <div className="space-y-4">
                                                     <div className="text-4xl mb-4">🧠✨</div>
                                                     <h1 className="text-2xl font-bold bg-gradient-to-r from-orange-400 via-yellow-400 to-orange-500 bg-clip-text text-transparent">
-                                                        Welcome to DocuMind
+                                                        Welcome to RecallAI
                                                     </h1>
                                                     <p className="text-gray-300 max-w-md mx-auto leading-relaxed">
                                                         Start intelligent conversations with your documents. Upload content and ask questions to unlock insights from your data.
@@ -199,7 +203,7 @@ function Chat(props: any, ref: any) {
                                 </div>
                                 <div className="bg-gradient-to-r from-gray-800/80 to-gray-700/80 p-4 rounded-2xl border border-gray-600/30 backdrop-blur-sm">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-gray-300">DocuMind is thinking</span>
+                                        <span className="text-gray-300">RecallAI is thinking</span>
                                         <div className="flex gap-1">
                                             <div className="w-2 h-2 bg-orange-400 rounded-full animate-bounce"></div>
                                             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-100"></div>

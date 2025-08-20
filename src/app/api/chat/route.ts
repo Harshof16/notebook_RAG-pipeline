@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       {
         collectionName: "notebook-collection",
         url: process.env.QDRANT_URL || "http://localhost:6333",
+        apiKey: process.env.QDRANT_API_KEY || "",
       }
     );
 
@@ -92,7 +93,7 @@ Answer:`);
         context: async (input: { question: string }) => {
           const docs = await retriever.invoke(input.question);
           return docs.map((d, idx) => {
-            const metadata = d.metadata || {};
+            // const metadata = d.metadata || {};
             return `[Document ${idx + 1}] ${d.pageContent}`;
           }).join("\n\n");
         },
@@ -117,14 +118,22 @@ Answer:`);
       }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in chat processing:", error);
-    
+
+    let errorMessage = "Something went wrong";
+    let errorStack = undefined;
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorStack = error.stack;
+    }
+
     return NextResponse.json(
       { 
         success: false,
-        error: error.message || "Something went wrong",
-        details: error.stack
+        error: errorMessage,
+        details: errorStack
       },
       { status: 500 }
     );

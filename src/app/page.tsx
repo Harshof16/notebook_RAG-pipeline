@@ -1,11 +1,11 @@
 "use client";
 
 import DataSourceForm from "@/components/DataSourceForm";
-import Chat from "@/components/Chat";
+import Chat, { ChatHandle } from "@/components/Chat";
 import { useRef } from "react";
 
 export default function Home() {
-  const chatRef = useRef<any>(null);
+  const chatRef = useRef<ChatHandle | null>(null);
 
   function handleIndexed() {
     // clear chat when new content is indexed
@@ -13,7 +13,7 @@ export default function Home() {
   }
 
   return (
-    <div className="w-full h-screen bg-gradient-to-br from-[#232a3a] via-[#1a2030] to-[#232a3a] flex items-center justify-center p-6">
+    <div className="w-full h-screen bg-gradient-to-br from-[#2d2e2f] via-[#1a2030] to-[#232a3a] flex items-center justify-center p-6">
       <div className="w-full max-w-7xl h-[92vh] rounded-3xl bg-gradient-to-br from-gray-900/95 via-blue-900/30 to-purple-900/20 shadow-2xl border border-white/10 overflow-hidden flex">
 
         {/* Left panel (uploads) */}

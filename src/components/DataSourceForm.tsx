@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
-import axios from "axios";
 import { fileToBase64 } from "@/lib/utils";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 
 interface DataSourceFormProps {
     onIndexed?: () => void;
@@ -26,7 +25,7 @@ export default function DataSourceForm({ onIndexed = () => {} }: DataSourceFormP
         chunks: number;
     }>(null);
 
-    const progressIntervalRef = useRef<any>(null);
+    const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const handleTabClick = (key: "url" | "text" | "file") => {
         // Cancel any ongoing simulated progress
@@ -77,7 +76,7 @@ export default function DataSourceForm({ onIndexed = () => {} }: DataSourceFormP
                     });
                 }, 150);
             }
-            const payload: any = {};
+            const payload: Record<string, unknown> = {};
 
             if (activeTab === "url") {
                 if (!url.trim()) {
@@ -130,18 +129,6 @@ export default function DataSourceForm({ onIndexed = () => {} }: DataSourceFormP
                 toast.success("Upload successful!");
                 onIndexed();
             }, 1800);
-
-            // Uncomment for real API call
-            // const res = await axios.post("/api/upload", payload);
-            // if (res.data.ok) {
-            //     toast.success("Upload successful!");
-            //     onIndexed();
-            //     setUrl("");
-            //     setText("");
-            //     setFile(null);
-            // } else {
-            //     toast.error("Upload failed. Please try again.");
-            // }
         } catch (err: any) {
             toast.error("Error uploading: " + (err?.message || "Unknown error"));
             setLoading(false);
@@ -201,74 +188,94 @@ export default function DataSourceForm({ onIndexed = () => {} }: DataSourceFormP
 
                 <div className="mb-8">
                     {activeTab === 'url' && (
-                        <div className="relative group">
-                            <input
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                placeholder="https://example.com"
-                                className="w-full p-4 rounded-xl bg-slate-800/50 text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 backdrop-blur-sm transition-all duration-300 group-hover:border-slate-500/50"
-                                disabled={loading}
-                            />
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                        </div>
+                        <>
+                            {skeleton ? (
+                                <div className="h-12 rounded-xl bg-slate-700/40 animate-pulse" />
+                            ) : (
+                                <div className="relative group">
+                                    <input
+                                        value={url}
+                                        onChange={(e) => setUrl(e.target.value)}
+                                        placeholder="https://example.com"
+                                        className="w-full p-4 rounded-xl bg-slate-800/50 text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 backdrop-blur-sm transition-all duration-300 group-hover:border-slate-500/50"
+                                        disabled={loading}
+                                    />
+                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {activeTab === 'text' && (
-                        <div className="relative group">
-                            <textarea
-                                value={text}
-                                onChange={(e) => setText(e.target.value)}
-                                placeholder="Paste your text content here..."
-                                className="w-full p-4 rounded-xl bg-slate-800/50 text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 backdrop-blur-sm transition-all duration-300 group-hover:border-slate-500/50 resize-none"
-                                rows={6}
-                                disabled={loading}
-                            />
-                            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-                            <div className="absolute bottom-3 right-3 text-xs text-slate-400">
-                                {text.length} characters
-                            </div>
-                        </div>
+                        <>
+                            {skeleton ? (
+                                <div className="h-36 rounded-xl bg-slate-700/40 animate-pulse" />
+                            ) : (
+                                <div className="relative group">
+                                    <textarea
+                                        value={text}
+                                        onChange={(e) => setText(e.target.value)}
+                                        placeholder="Paste your text content here..."
+                                        className="w-full p-4 rounded-xl bg-slate-800/50 text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 backdrop-blur-sm transition-all duration-300 group-hover:border-slate-500/50 resize-none"
+                                        rows={6}
+                                        disabled={loading}
+                                    />
+                                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                                    <div className="absolute bottom-3 right-3 text-xs text-slate-400">
+                                        {text.length} characters
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {activeTab === 'file' && (
                         <div className="space-y-4">
-                            {!processedFile && <div className="relative group">
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600/50 rounded-xl cursor-pointer bg-slate-800/30 hover:bg-slate-700/30 transition-all duration-300 group-hover:border-cyan-500/50">
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                        <span className="text-3xl mb-2">📁</span>
-                                        <p className="mb-2 text-sm text-slate-300">
-                                            <span className="font-semibold">Click to upload</span> 
-                                            {/* or drag and drop */}
-                                        </p>
-                                        <p className="text-xs text-slate-400">PDF, CSV, or TXT (MAX. 10MB)</p>
-                                    </div>
-                                    <input
-                                        type="file"
-                                        accept=".pdf,.csv,.txt"
-                                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                        className="hidden"
-                                        disabled={loading}
-                                    />
-                                </label>
-                            </div>}
-                            
-                            {file && !processedFile && (
-                                <div className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-xl border border-slate-600/30 backdrop-blur-sm">
-                                    <span className="text-lg">{getFileIcon(file.name)}</span>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                                        <p className="text-xs text-slate-400">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setFile(null)}
-                                        className="text-slate-400 hover:text-red-400 transition-colors duration-200 cursor-pointer"
-                                        disabled={loading}
-                                        aria-disabled={loading}
-                                        title="Remove file"
-                                    >
-                                        ✕
-                                    </button>
+                            {skeleton ? (
+                                <div className="h-32 rounded-xl bg-slate-700/40 animate-pulse flex items-center justify-center">
+                                    <span className="text-sm text-slate-400">Indexing file...</span>
                                 </div>
+                            ) : (
+                                <>
+                                    {!processedFile && <div className="relative group">
+                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600/50 rounded-xl cursor-pointer bg-slate-800/30 hover:bg-slate-700/30 transition-all duration-300 group-hover:border-cyan-500/50">
+                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                                <span className="text-3xl mb-2">📁</span>
+                                                <p className="mb-2 text-sm text-slate-300">
+                                                    <span className="font-semibold">Click to upload</span> 
+                                                    {/* or drag and drop */}
+                                                </p>
+                                                <p className="text-xs text-slate-400">PDF, CSV, or TXT (MAX. 10MB)</p>
+                                            </div>
+                                            <input
+                                                type="file"
+                                                accept=".pdf,.csv,.txt"
+                                                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                                className="hidden"
+                                                disabled={loading}
+                                            />
+                                        </label>
+                                    </div>}
+                                    
+                                    {file && !processedFile && (
+                                        <div className="flex items-center gap-3 p-3 bg-slate-700/30 rounded-xl border border-slate-600/30 backdrop-blur-sm">
+                                            <span className="text-lg">{getFileIcon(file.name)}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                                                <p className="text-xs text-slate-400">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setFile(null)}
+                                                className="text-slate-400 hover:text-red-400 transition-colors duration-200 cursor-pointer"
+                                                disabled={loading}
+                                                aria-disabled={loading}
+                                                title="Remove file"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
